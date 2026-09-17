@@ -42,6 +42,14 @@ if st.session_state.user is None:
                 })
 
                 st.session_state.user = response.user
+                st.session_state.access_token = response.session.access_token
+                st.session_state.refresh_token = response.session.refresh_token
+
+                supabase.auth.set_session(
+                response.session.access_token,
+                response.session.refresh_token
+)
+
                 st.success("Login successful!")
                 st.rerun()
 
