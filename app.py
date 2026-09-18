@@ -1,5 +1,6 @@
 import streamlit as st
 import joblib
+import pandas as pd
 from supabase import create_client
 
 # Supabase connection
@@ -21,9 +22,13 @@ if "access_token" in st.session_state and "refresh_token" in st.session_state:
 model = joblib.load("sentiment_model.pkl")
 vectorizer = joblib.load("tfidf_vectorizer.pkl")
 
-st.set_page_config(page_title="AI Sentiment Analyzer")
+st.set_page_config(
+    page_title="AI Sentiment Analyzer",
+    layout="wide"
+)
 
 st.title("AI Sentiment Analyzer")
+st.caption("Analye customer reviews and track sentiment insights with machin learning.")
 
 # Login / Signup
 if "user" not in st.session_state:
@@ -110,47 +115,82 @@ else:
         height=120
     )
 
-if st.button("Analyze Sentiment"):
-    if not review.strip():
-        st.warning("Please enter a review.")
-    else:
-        input_vector = vectorizer.transform([review])
+if st.button("Analyze Sentiment", width="stretch"):
+        if not review.strip():
+            st.warning("Please enter a review.")
+        else:
+            input_vector = vectorizer.transform([review])
 
-        prediction = model.predict(input_vector)[0]
+            prediction = model.predict(input_vector)[0]
 
-        probabilities = model.predict_proba(input_vector)[0]
-        confidence = max(probabilities) * 100
+            probabilities = model.predict_proba(input_vector)[0]
+            confidence = max(probabilities) * 100
 
-        st.subheader("Result")
-        st.write(f"**Sentiment:** {prediction.upper()}")
-        st.write(f"**Confidence:** {confidence:.2f}%")
+            st.subheader("Prediction Result")
+            if prediction == "positive":
+                st.success(f"Positive Sentiment -{confidence:.2f}% confidence")
+            else:
+                st.error(f"Negative Sentiment - {confidence:.2f}% confidence")
+           
 
-        supabase.table("sentiment_history").insert({
-        "user_id": st.session_state.user.id,
-        "review": review,
-        "sentiment": prediction,
-        "confidence": confidence
-}).execute()
+            supabase.table("sentiment_history").insert({
+                "user_id": st.session_state.user.id,
+                "review": review,
+                "sentiment": prediction,
+                "confidence": confidence
+            }).execute()
 
-st.success("Prediction saved to your history!")
+            st.success("Prediction saved to your history!")
 
-if st.session_state.user is not None:
-    st.divider()
+            st.divider()
 
-    st.subheader("Your Sentiment History")
+            st.subheader("Dashboard")
+            st.caption("Overview of your sentiment analysis activity.")
 
-    history = supabase.table("sentiment_history") \
+
+        history = supabase.table("sentiment_history") \
         .select("review, sentiment, confidence, created_at") \
         .eq("user_id", st.session_state.user.id) \
         .order("created_at", desc=True) \
         .execute()
 
-    if history.data:
-        for item in history.data:
-            st.write(f"**Review:** {item['review']}")
-            st.write(f"**Sentiment:** {item['sentiment'].upper()}")
-            st.write(f"**Confidence:** {item['confidence']:.2f}%")
-            st.write(f"**Date:** {item['created_at']}")
-            st.divider()
-    else:
+        if history.data:
+
+           history_df = pd.DataFrame(history.data)
+
+        col1, col2, col3, col4 = st.columns(4)
+
+        col1.metric("Total Predictions", len(history_df))
+        col2.metric("Positive", (history_df["sentiment"] == "positive").sum())
+        col3.metric("Negative", (history_df["sentiment"] == "negative").sum())
+        col4.metric("Avg Confidence", f"{history_df['confidence'].mean():.2f}%")
+
+        st.subheader("Sentiment Distribution")
+
+        chart_data = pd.DataFrame({
+            "Sentiment": ["Positive", "Negative"],
+            "Count": [
+                (history_df["sentiment"] == "positive").sum(),
+                (history_df["sentiment"] == "negative").sum()
+            ]
+        })
+
+        st.bar_chart(chart_data.set_index("Sentiment"))
+
+        history_df["created_at"] = pd.to_datetime(history_df["created_at"])
+        history_df["created_at"] = history_df["created_at"].dt.strftime("%d-%m-%Y %H:%M")
+
+       
+
+        st.dataframe(
+            history_df.rename(columns={
+                "review": "Review",
+                "sentiment": "Sentiment",
+                "confidence": "Confidence",
+                "created_at": "Date"
+            }),
+            width="stretch"
+        )
+
+else:
         st.info("No prediction history yet.")
