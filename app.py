@@ -7,6 +7,15 @@ supabase = create_client(
     st.secrets["SUPABASE_URL"],
     st.secrets["SUPABASE_KEY"]
 )
+# Restore Supabase session after Streamlit rerun
+if "access_token" in st.session_state and "refresh_token" in st.session_state:
+    try:
+        supabase.auth.set_session(
+            st.session_state.access_token,
+            st.session_state.refresh_token
+        )
+    except Exception:
+        pass
 
 # Load ML model
 model = joblib.load("sentiment_model.pkl")
@@ -101,17 +110,47 @@ else:
         height=120
     )
 
-    if st.button("Analyze Sentiment"):
-        if not review.strip():
-            st.warning("Please enter a review.")
-        else:
-            input_vector = vectorizer.transform([review])
+if st.button("Analyze Sentiment"):
+    if not review.strip():
+        st.warning("Please enter a review.")
+    else:
+        input_vector = vectorizer.transform([review])
 
-            prediction = model.predict(input_vector)[0]
+        prediction = model.predict(input_vector)[0]
 
-            probabilities = model.predict_proba(input_vector)[0]
-            confidence = max(probabilities) * 100
+        probabilities = model.predict_proba(input_vector)[0]
+        confidence = max(probabilities) * 100
 
-            st.subheader("Result")
-            st.write(f"**Sentiment:** {prediction.upper()}")
-            st.write(f"**Confidence:** {confidence:.2f}%")
+        st.subheader("Result")
+        st.write(f"**Sentiment:** {prediction.upper()}")
+        st.write(f"**Confidence:** {confidence:.2f}%")
+
+        supabase.table("sentiment_history").insert({
+        "user_id": st.session_state.user.id,
+        "review": review,
+        "sentiment": prediction,
+        "confidence": confidence
+}).execute()
+
+st.success("Prediction saved to your history!")
+
+if st.session_state.user is not None:
+    st.divider()
+
+    st.subheader("Your Sentiment History")
+
+    history = supabase.table("sentiment_history") \
+        .select("review, sentiment, confidence, created_at") \
+        .eq("user_id", st.session_state.user.id) \
+        .order("created_at", desc=True) \
+        .execute()
+
+    if history.data:
+        for item in history.data:
+            st.write(f"**Review:** {item['review']}")
+            st.write(f"**Sentiment:** {item['sentiment'].upper()}")
+            st.write(f"**Confidence:** {item['confidence']:.2f}%")
+            st.write(f"**Date:** {item['created_at']}")
+            st.divider()
+    else:
+        st.info("No prediction history yet.")
