@@ -115,23 +115,21 @@ else:
         height=120
     )
 
-if st.button("Analyze Sentiment", width="stretch"):
+    if st.button("Analyze Sentiment"):
         if not review.strip():
             st.warning("Please enter a review.")
         else:
             input_vector = vectorizer.transform([review])
 
             prediction = model.predict(input_vector)[0]
-
             probabilities = model.predict_proba(input_vector)[0]
             confidence = max(probabilities) * 100
 
             st.subheader("Prediction Result")
             if prediction == "positive":
-                st.success(f"Positive Sentiment -{confidence:.2f}% confidence")
+                st.success(f"Positive Sentiment - {confidence:.2f}% confidence")
             else:
                 st.error(f"Negative Sentiment - {confidence:.2f}% confidence")
-           
 
             supabase.table("sentiment_history").insert({
                 "user_id": st.session_state.user.id,
@@ -141,56 +139,111 @@ if st.button("Analyze Sentiment", width="stretch"):
             }).execute()
 
             st.success("Prediction saved to your history!")
-
             st.divider()
+            st.subheader("Batch Analysis")
+
+            uploaded_file = st.file_uploader(
+                "Upload a CSV file containing reviews",
+                type=["csv"]
+            )
+
+            if uploaded_file is not None:
+                batch_df = pd.read_csv(uploaded_file)
+
+                if "review" not in batch_df.columns:
+                    st.error("CSV must contain a 'review' column.")
+                else:
+                    batch_df["sentiment"] = batch_df["review"].apply(
+                        lambda x: model.predict(
+                            vectorizer.transform([str(x)])
+                        )[0]
+                    )
+
+                    batch_df["confidence"] = batch_df["review"].apply(
+                        lambda x: max(
+                            model.predict_proba(
+                                vectorizer.transform([str(x)])
+                            )[0]
+                        ) * 100
+                    )
+
+                    st.subheader("Batch Results")
+                    st.dataframe(
+                        batch_df,
+                        width="stretch",
+                        hide_index=True
+                    )
+
+                    csv_data = batch_df.to_csv(index=False)
+                    st.download_button(
+                        "Download Batch Results",
+                        data=csv_data,
+                        file_name="sentiment_results.csv",
+                        mime="text/csv"
+                    )
 
             st.subheader("Dashboard")
-            st.caption("Overview of your sentiment analysis activity.")
 
+            history = supabase.table("sentiment_history") \
+                .select("review, sentiment, confidence, created_at") \
+                .eq("user_id", st.session_state.user.id) \
+                .order("created_at", desc=True) \
+                .execute()
+            history_df = pd.DataFrame(history.data)
 
-        history = supabase.table("sentiment_history") \
-        .select("review, sentiment, confidence, created_at") \
-        .eq("user_id", st.session_state.user.id) \
-        .order("created_at", desc=True) \
-        .execute()
+            col1, col2, col3, col4 = st.columns(4)
 
-        if history.data:
-
-           history_df = pd.DataFrame(history.data)
-
-        col1, col2, col3, col4 = st.columns(4)
-
-        col1.metric("Total Predictions", len(history_df))
-        col2.metric("Positive", (history_df["sentiment"] == "positive").sum())
-        col3.metric("Negative", (history_df["sentiment"] == "negative").sum())
-        col4.metric("Avg Confidence", f"{history_df['confidence'].mean():.2f}%")
-
-        st.subheader("Sentiment Distribution")
-
-        chart_data = pd.DataFrame({
-            "Sentiment": ["Positive", "Negative"],
-            "Count": [
-                (history_df["sentiment"] == "positive").sum(),
+            col1.metric("Total Predictions", len(history_df))
+            col2.metric(
+                "Positive",
+                (history_df["sentiment"] == "positive").sum()
+            )
+            col3.metric(
+                "Negative",
                 (history_df["sentiment"] == "negative").sum()
-            ]
-        })
+            )
+            col4.metric(
+                "Avg Confidence",
+                f"{history_df['confidence'].mean():.2f}%"
+            )
 
-        st.bar_chart(chart_data.set_index("Sentiment"))
+            st.subheader("Sentiment Distribution")
 
-        history_df["created_at"] = pd.to_datetime(history_df["created_at"])
-        history_df["created_at"] = history_df["created_at"].dt.strftime("%d-%m-%Y %H:%M")
+            chart_data = pd.DataFrame({
+                "Sentiment": ["Positive", "Negative"],
+                "Count": [
+                    (history_df["sentiment"] == "positive").sum(),
+                    (history_df["sentiment"] == "negative").sum()
+                ]
+            })
 
-       
+            st.bar_chart(
+                chart_data.set_index("Sentiment")
+            )
 
-        st.dataframe(
-            history_df.rename(columns={
+            history_df["created_at"] = pd.to_datetime(
+                history_df["created_at"]
+            )
+
+            history_df["created_at"] = history_df["created_at"].dt.strftime(
+                "%d-%m-%Y %H:%M"
+            )
+
+            display_df = history_df.rename(columns={
                 "review": "Review",
                 "sentiment": "Sentiment",
                 "confidence": "Confidence",
                 "created_at": "Date"
-            }),
-            width="stretch"
-        )
+            })
 
-else:
+            display_df["Confidence"] = display_df["Confidence"].map(
+                lambda x: f"{x:.2f}%"
+            )
+
+            st.dataframe(
+                display_df,
+                width="stretch",
+                hide_index=True
+            )
+    else:
         st.info("No prediction history yet.")
