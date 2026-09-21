@@ -1,8 +1,8 @@
-🤖 AI Sentiment Analyzer
+AI Sentiment Analyzer
 
 A machine learning project that analyzes text reviews and predicts whether the sentiment is Positive or Negative.
 
-🚀 Features
+ Features
 
 * Text sentiment classification
 * TF-IDF text vectorization
@@ -11,7 +11,7 @@ A machine learning project that analyzes text reviews and predicts whether the s
 * Interactive Gradio web interface
 * Runs locally in a web browser
 
-🛠️ Technologies Used
+ Technologies Used
 
 * Python
 * Pandas
@@ -21,13 +21,13 @@ A machine learning project that analyzes text reviews and predicts whether the s
 * Joblib
 * Gradio
 
-📊 Model Performance
+ Model Performance
 
 Test Accuracy: 83.09%
 
 The model was trained and evaluated using a labeled sentiment dataset.
 
-🧠 How It Works
+ How It Works
 
 User Review
      ↓
@@ -39,7 +39,7 @@ Sentiment Prediction
      ↓
 Positive / Negative + Confidence
 
-▶️ How to Run
+ How to Run
 
 1. Install the required packages
 
@@ -55,7 +55,7 @@ After running the application, open the URL shown in the terminal, for example:
 
 http://127.0.0.1:7860
 
-📁 Project Structure
+ Project Structure
 
 AI Sentimental Analysis/
 │
@@ -65,7 +65,7 @@ AI Sentimental Analysis/
 ├── requirements.txt
 └── README.md
 
-💡 Example
+Example
 
 Input:
 
@@ -76,6 +76,6 @@ Output:
 Sentiment: POSITIVE
 Confidence: 79.98%
 
-👨‍💻 Project
+Project
 
 AI Sentiment Analyzer — Machine Learning Project
